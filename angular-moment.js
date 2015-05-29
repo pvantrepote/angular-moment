@@ -29,10 +29,10 @@
 				 * @ngdoc property
 				 * @name angularMoment.config.angularMomentConfig#preprocess
 				 * @propertyOf angularMoment.config:angularMomentConfig
-				 * @returns {string} The default preprocessor to apply
+				 * @returns {string|array} The default preprocessor(s) to apply
 				 *
 				 * @description
-				 * Defines a default preprocessor to apply (e.g. 'unix', 'etc', ...). The default value is null,
+				 * Defines a default preprocessor(s) to apply (e.g. 'unix', 'etc', ...). The default value is null,
 				 * i.e. no preprocessor will be applied.
 				 */
 				preprocess: null, // e.g. 'unix', 'utc', ...
@@ -316,7 +316,15 @@
 				 */
 				this.preprocessors = {
 					utc: moment.utc,
-					unix: moment.unix
+					unix: moment.unix,
+					local: function(aMoment) {
+						if (!moment.isMoment(aMoment)) {
+							$log.warn('angular-moment: Ignoring unsupported value for local preprocess: ' + aMoment);
+							return aMoment;
+						}
+
+						return aMoment.local();
+					}
 				};
 
 				/**
@@ -366,13 +374,23 @@
 				 * am-time-ago directive and the filters.
 				 *
 				 * @param {*} value The value to be preprocessed
-				 * @param {string} preprocess The name of the preprocessor the apply (e.g. utc, unix)
+				 * @param {string|array} preprocess The name of the preprocessor the apply (e.g. utc, unix, or ['unix', 'utc'])
 				 * @param {string=} format Specifies how to parse the value (see {@link http://momentjs.com/docs/#/parsing/string-format/})
 				 * @return {Moment} A value that can be parsed by the moment library
 				 */
 				this.preprocessDate = function (value, preprocess, format) {
 					if (angular.isUndefined(preprocess)) {
 						preprocess = angularMomentConfig.preprocess;
+					}
+					if (preprocess instanceof Array) {
+						var previousResult = value;
+						var $this = this;
+
+						preprocess.forEach(function(aPreprocess) {
+							previousResult = $this.preprocessDate(previousResult, aPreprocess, format);
+						});
+
+						return previousResult;
 					}
 					if (this.preprocessors[preprocess]) {
 						return this.preprocessors[preprocess](value, format);
